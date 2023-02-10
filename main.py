@@ -1,10 +1,9 @@
 import csv
 import socket
-import threading
 
 import paramiko
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, ttk
 
 
 def browse_devices_file():
@@ -167,6 +166,9 @@ commands_entry.grid(row=5, column=0, columnspan=2)
 # Create a button to initiate the SSH connection
 ssh_button = ttk.Button(root, text="Execute", command=ssh_to_devices)
 ssh_button.grid(row=6, column=0, padx=10)
+
+copyright_label = tk.Label(root, text="Developed for VOIS By AJ")
+copyright_label.grid(row=7, column=2, columnspan=1)
 
 # Start the GUI event loop
 root.mainloop()
