@@ -100,7 +100,7 @@ def ssh_to_device():
 
 # Create a GUI window
 root = tk.Tk()
-root.title("SSH to Cisco Device")
+root.title("Login to Cisco Device")
 
 # Create entry widgets for device, username, and password
 devices_file_label = tk.Label(root, text="Device IP file:")
