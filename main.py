@@ -1,5 +1,7 @@
 import csv
 import socket
+import threading
+
 import paramiko
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -19,28 +21,37 @@ def browse_output_file():
     output_file_entry.insert(0, output_file)
 
 
-def ssh_to_device():
-    # Create the progress bar
-    progress_bar = ttk.Progressbar(root, orient="horizontal", length=200, mode="indeterminate")
-    progress_bar.grid(row=5, column=1, padx=10)
-    progress_bar.start()
+def ssh_to_devices():
+    # Open File with Device IPs
     with open(devices_file_entry.get(), 'r') as csvfile:
         device_reader = csv.reader(csvfile)
-        # device_ips = [row[0] for row in device_reader]
         device_ips = []
 
         for row in device_reader:
             device_ips.append(row)
         print(device_ips[0])
-    # Create an SSH client
-    client = paramiko.SSHClient()
 
-    # Set policy to automatically add the host key
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     with open(output_file_entry.get(), 'a') as outfile:
         for device_ip in device_ips[0]:
             try:
-                # Connect to the device
+                # Connect to jump server
+                jump_client = paramiko.SSHClient()
+                jump_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                jump_client.connect(hostname=server_entry.get(), username=username_entry.get(),
+                                    password=password_entry.get())
+
+                # Connect to the remote device through the jump server
+                transport = jump_client.get_transport()
+                dest_addr = (device_ip, 22)
+                local_addr = (server_entry.get(), 22)
+                channel = transport.open_channel("direct-tcpip", dest_addr, local_addr)
+
+                # Create an SSH client
+                client = paramiko.SSHClient()
+                # Set policy to automatically add the host key
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client._transport = channel
+
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(10)  # set a timeout of 10 seconds
                 client.connect(hostname=device_ip, username=username_entry.get(), password=password_entry.get())
@@ -72,8 +83,7 @@ def ssh_to_device():
                 continue
             try:
                 # Execute a command on the device
-                commands = ["code -v", "cd"]
-
+                commands = commands_entry.get("1.0", "end").strip().split(",")
                 outfile.write("Output for device " + device_ip + "\n")
                 for command in commands:
                     stdin, stdout, stderr = client.exec_command(command)
@@ -81,10 +91,6 @@ def ssh_to_device():
                     outfile.write("Output for command " + "'" + command + "'" + ":" + "\n")
                     outfile.write(output)
                     outfile.write("\n")
-                # stdin, stdout, stderr = client.exec_command("code -v; cd")
-                # Write the output of the command to the output file
-
-                # outfile.write(stdout.read().decode("utf-8"))
 
                 outfile.write("######################################################### " + "\n")
                 outfile.write("\n\n")
@@ -93,9 +99,30 @@ def ssh_to_device():
 
         # Close the connection to the device
         client.close()
-    progress_bar.stop()
+
     # Inform the user that the output has been written to the file
     print("Output written to", output_file_entry.get())
+
+
+# def ssh_to_devices():
+#     # Create the thread
+#     ssh_thread = threading.Thread(target=ssh_to_devices_thread)
+#
+#     # Start the thread
+#     ssh_thread.start()
+#
+#     # Create the progress bar
+#     progress_bar = ttk.Progressbar(root, orient="horizontal", length=200, mode="indeterminate")
+#     progress_bar.grid(row=5, column=1, padx=10)
+#
+#     # Start the progress bar
+#     progress_bar.start()
+#
+#     # Wait for the thread to finish
+#     ssh_thread.join()
+#
+#     # Stop the progress bar
+#     progress_bar.stop()
 
 
 # Create a GUI window
@@ -110,26 +137,36 @@ devices_file_entry.grid(row=0, column=1)
 browse_devices_file_button = tk.Button(root, text="Browse", command=browse_devices_file)
 browse_devices_file_button.grid(row=0, column=2)
 
+server_label = tk.Label(root, text="TACACS IP")
+server_label.grid(row=1, column=0)
+server_entry = tk.Entry(root)
+server_entry.grid(row=1, column=1)
+
 username_label = tk.Label(root, text="Username:")
-username_label.grid(row=1, column=0)
+username_label.grid(row=2, column=0)
 username_entry = tk.Entry(root)
-username_entry.grid(row=1, column=1)
+username_entry.grid(row=2, column=1)
 
 password_label = tk.Label(root, text="Password:")
-password_label.grid(row=2, column=0)
+password_label.grid(row=3, column=0)
 password_entry = tk.Entry(root, show="*")
-password_entry.grid(row=2, column=1)
+password_entry.grid(row=3, column=1)
 
 output_file_label = tk.Label(root, text="Output file:")
-output_file_label.grid(row=3, column=0)
+output_file_label.grid(row=4, column=0)
 output_file_entry = tk.Entry(root)
-output_file_entry.grid(row=3, column=1)
+output_file_entry.grid(row=4, column=1)
 browse_output_file_button = tk.Button(root, text="Browse", command=browse_output_file)
-browse_output_file_button.grid(row=3, column=2)
+browse_output_file_button.grid(row=4, column=2)
+
+# Create the Text widget to input the commands
+commands_entry_label = tk.Label(root, text="Commands")
+commands_entry = tk.Text(root, height=10, width=20)
+commands_entry.grid(row=5, column=0, columnspan=2)
 
 # Create a button to initiate the SSH connection
-ssh_button = ttk.Button(root, text="SSH", command=ssh_to_device)
-ssh_button.grid(row=4, column=0, padx=10)
+ssh_button = ttk.Button(root, text="Execute", command=ssh_to_devices)
+ssh_button.grid(row=6, column=0, padx=10)
 
 # Start the GUI event loop
 root.mainloop()
