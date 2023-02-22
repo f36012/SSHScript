@@ -37,14 +37,38 @@ def ssh_to_devices():
                 jump_client = paramiko.SSHClient()
                 jump_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 jump_client.connect(hostname=server_entry.get(), username=username_entry.get(),
-                                    password=password_entry.get())
+                                    password=password_entry.get(), allow_agent=False, look_for_keys=False)
 
-                # Connect to the device through the jump server
+                # Open a channel to the jump server terminal
+                transport = jump_client.get_transport()
+                channel = transport.open_session()
+                channel.get_pty()
+                channel.exec_command('bash')
+
+                # Type 'ssh device_ip' on the jump server terminal
+                stdin = channel.makefile('wb')
+                stdout = channel.makefile('rb')
+                stdin.write('ssh {}\n'.format(device_ip))
+                stdin.flush()
+
+                # Wait for the password prompt on the jump server terminal
+                while not channel.exit_status_ready():
+                    output = stdout.read(1024).decode('utf-8')
+                    if 'password' in output.lower():
+                        break
+                # Send the device password to the jump server terminal
+                stdin.write('{}\n'.format(password_entry.get()))
+                stdin.flush()
+                # Wait for the SSH connection to be established
+                while not channel.exit_status_ready():
+                    output = stdout.read(1024).decode('utf-8')
+                    if 'password' not in output.lower():
+                        break
+
+                # Create an SSH client for the device
                 client = paramiko.SSHClient()
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                client.connect(hostname=device_ip, username=username_entry.get(), password=password_entry.get(),
-                               sock=jump_client.get_transport().open_channel("direct-tcpip", (device_ip, 22),
-                                                                             ('127.0.0.1', 0)))
+                client._transport = transport
 
             except socket.gaierror:
                 # messagebox.showerror("Error",
@@ -95,7 +119,6 @@ def ssh_to_devices():
     print("Output written to", output_file_entry.get())
 
 
-
 # Create a GUI window
 root = tk.Tk()
 root.title("Login to Cisco Device")
@@ -132,7 +155,7 @@ browse_output_file_button.grid(row=4, column=2)
 
 # Create the Text widget to input the commands
 commands_entry_label = tk.Label(root, text="Commands")
-commands_entry_label.grid(row=5,column=0)
+commands_entry_label.grid(row=5, column=0)
 commands_entry = tk.Text(root, height=10, width=20)
 commands_entry.grid(row=5, column=1, columnspan=2)
 
