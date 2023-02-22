@@ -39,21 +39,20 @@ def ssh_to_devices():
                 jump_client.connect(hostname=server_entry.get(), username=username_entry.get(),
                                     password=password_entry.get())
 
-                # Connect to the remote device through the jump server
+                # Open a new channel on the jump server and forward it to the remote device
                 transport = jump_client.get_transport()
                 dest_addr = (device_ip, 22)
-                local_addr = (server_entry.get(), 22)
-                channel = transport.open_channel("direct-tcpip", dest_addr, local_addr)
+                local_addr = ('localhost', 0)
+                channel = transport.open_channel('dynamic', dest_addr, local_addr)
 
-                # Create an SSH client
+                # Create an SSH client and use the forwarded channel as a SOCKS proxy
                 client = paramiko.SSHClient()
-                # Set policy to automatically add the host key
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                client._transport = channel
+                client.set_transport(transport)
+                sock = channel.makefile('rwb')
+                client.connect(hostname='localhost', username=username_entry.get(),
+                               password=password_entry.get(), sock=sock)
 
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(10)  # set a timeout of 10 seconds
-                client.connect(hostname=device_ip, username=username_entry.get(), password=password_entry.get())
             except socket.gaierror:
                 # messagebox.showerror("Error",
                 #                      "Failed to connect to the device. Hostname or IP address could not be resolved.")
@@ -103,26 +102,6 @@ def ssh_to_devices():
     print("Output written to", output_file_entry.get())
 
 
-# def ssh_to_devices():
-#     # Create the thread
-#     ssh_thread = threading.Thread(target=ssh_to_devices_thread)
-#
-#     # Start the thread
-#     ssh_thread.start()
-#
-#     # Create the progress bar
-#     progress_bar = ttk.Progressbar(root, orient="horizontal", length=200, mode="indeterminate")
-#     progress_bar.grid(row=5, column=1, padx=10)
-#
-#     # Start the progress bar
-#     progress_bar.start()
-#
-#     # Wait for the thread to finish
-#     ssh_thread.join()
-#
-#     # Stop the progress bar
-#     progress_bar.stop()
-
 
 # Create a GUI window
 root = tk.Tk()
@@ -160,8 +139,9 @@ browse_output_file_button.grid(row=4, column=2)
 
 # Create the Text widget to input the commands
 commands_entry_label = tk.Label(root, text="Commands")
+commands_entry_label.grid(row=5,column=0)
 commands_entry = tk.Text(root, height=10, width=20)
-commands_entry.grid(row=5, column=0, columnspan=2)
+commands_entry.grid(row=5, column=1, columnspan=2)
 
 # Create a button to initiate the SSH connection
 ssh_button = ttk.Button(root, text="Execute", command=ssh_to_devices)
