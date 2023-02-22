@@ -33,25 +33,18 @@ def ssh_to_devices():
     with open(output_file_entry.get(), 'a') as outfile:
         for device_ip in device_ips[0]:
             try:
-                # Connect to jump server
+                # Connect to the jump server
                 jump_client = paramiko.SSHClient()
                 jump_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 jump_client.connect(hostname=server_entry.get(), username=username_entry.get(),
                                     password=password_entry.get())
 
-                # Open a new channel on the jump server and forward it to the remote device
-                transport = jump_client.get_transport()
-                dest_addr = (device_ip, 22)
-                local_addr = ('localhost', 0)
-                channel = transport.open_channel('dynamic', dest_addr, local_addr)
-
-                # Create an SSH client and use the forwarded channel as a SOCKS proxy
+                # Connect to the device through the jump server
                 client = paramiko.SSHClient()
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                client.set_transport(transport)
-                sock = channel.makefile('rwb')
-                client.connect(hostname='localhost', username=username_entry.get(),
-                               password=password_entry.get(), sock=sock)
+                client.connect(hostname=device_ip, username=username_entry.get(), password=password_entry.get(),
+                               sock=jump_client.get_transport().open_channel("direct-tcpip", (device_ip, 22),
+                                                                             ('127.0.0.1', 0)))
 
             except socket.gaierror:
                 # messagebox.showerror("Error",
