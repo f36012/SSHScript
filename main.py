@@ -44,11 +44,15 @@ def ssh_to_devices():
                 channel = transport.open_session()
                 channel.get_pty()
                 channel.exec_command('bash')
-
+                print("Executed bash")
                 # Type 'ssh device_ip' on the jump server terminal
+                print("Ready to create input/output object file")
                 stdin = channel.makefile('wb')
                 stdout = channel.makefile('rb')
-                stdin.write('ssh {}\n'.format(device_ip))
+                print("Created input/output object file")
+                stdin.write('ssh ' + device_ip)
+                output = stdout.read()
+                print(output)
                 stdin.flush()
 
                 # Wait for the password prompt on the jump server terminal
