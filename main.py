@@ -38,10 +38,10 @@ def ssh_to_devices():
             try:
                 try:
                     # Connect to the jump server
-                    net_connect = Netmiko(device_type="terminal_server", ip=server_entry.get(),
+                    net_connect = Netmiko(device_type="terminal_server", host=server_entry.get(),
                                           username=username_entry.get(),
                                           password=password_entry.get())
-                    # print("Jump server prompt: " + (net_connect.find_prompt()))
+                    print("Jump server prompt: " + (net_connect.find_prompt()))
                 except socket.timeout:
                     print("Timeout for jump server ", server_entry.get(), ":", e)
                     outfile.write("Timeout Error,failed to connect to Jump Server :  " + device_ip + "\n")
@@ -56,10 +56,10 @@ def ssh_to_devices():
                     print("Error ")
                     continue
                 # Login to first device
-                net_connect.write_channel(f'ssh {device_ip}\r\n')
+                net_connect.write_channel(f'ssh {device_ip}\n')
                 time.sleep(1)
                 output = net_connect.read_channel()
-
+                print(output)
                 if 'Are you sure you want to continue connecting' in output:
                     net_connect.write_channel('yes' + '\n')
                     output = net_connect.read_channel()
